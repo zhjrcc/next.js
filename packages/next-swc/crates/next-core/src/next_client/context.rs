@@ -9,6 +9,7 @@ use turbopack_binding::{
     turbopack::{
         browser::{react_refresh::assert_can_resolve_react_refresh, BrowserChunkingContext},
         core::{
+            chunk::ChunkingContext,
             compile_time_info::{
                 CompileTimeDefineValue, CompileTimeDefines, CompileTimeInfo, FreeVarReference,
                 FreeVarReferences,
@@ -17,7 +18,7 @@ use turbopack_binding::{
             free_var_references,
             resolve::{parse::Request, pattern::Pattern},
         },
-        ecmascript::{chunk::EcmascriptChunkingContext, TreeShakingMode},
+        ecmascript::TreeShakingMode,
         node::{
             execution_context::ExecutionContext,
             transforms::postcss::{PostCssConfigLocation, PostCssTransformOptions},
@@ -40,6 +41,7 @@ use crate::{
     next_build::get_postcss_package_mapping,
     next_client::runtime_entry::{RuntimeEntries, RuntimeEntry},
     next_config::NextConfig,
+    next_font::local::NextFontLocalResolvePlugin,
     next_import_map::{
         get_next_client_fallback_import_map, get_next_client_import_map,
         get_next_client_resolved_map,
@@ -156,7 +158,8 @@ pub async fn get_client_resolve_options_context(
         resolved_map: Some(next_client_resolved_map),
         browser: true,
         module: true,
-        plugins: vec![
+        before_resolve_plugins: vec![Vc::upcast(NextFontLocalResolvePlugin::new(project_path))],
+        after_resolve_plugins: vec![
             Vc::upcast(ModuleFeatureReportResolvePlugin::new(project_path)),
             Vc::upcast(UnsupportedModulesResolvePlugin::new(project_path)),
             Vc::upcast(NextSharedRuntimeResolvePlugin::new(project_path)),
@@ -176,6 +179,16 @@ pub async fn get_client_resolve_options_context(
         ..module_options_context
     }
     .cell())
+}
+
+fn internal_assets_conditions() -> ContextCondition {
+    ContextCondition::any(vec![
+        ContextCondition::InPath(next_js_fs().root()),
+        ContextCondition::InPath(
+            turbopack_binding::turbopack::ecmascript_runtime::embed_fs().root(),
+        ),
+        ContextCondition::InPath(turbopack_binding::turbopack::node::embed_js::embed_fs().root()),
+    ])
 }
 
 #[turbo_tasks::function]
@@ -288,10 +301,8 @@ pub async fn get_client_module_options_context(
                 foreign_code_context_condition(next_config, project_path).await?,
                 foreign_codes_options_context.cell(),
             ),
-            // If the module is an internal asset (i.e overlay, fallback) coming from the embedded
-            // FS, don't apply user defined transforms.
             (
-                ContextCondition::InPath(next_js_fs().root()),
+                internal_assets_conditions(),
                 ModuleOptionsContext {
                     enable_typescript_transform: Some(TypescriptTransformOptions::default().cell()),
                     enable_jsx: Some(JsxTransformOptions::default().cell()),
@@ -316,7 +327,7 @@ pub async fn get_client_chunking_context(
     asset_prefix: Vc<Option<String>>,
     environment: Vc<Environment>,
     mode: Vc<NextMode>,
-) -> Result<Vc<Box<dyn EcmascriptChunkingContext>>> {
+) -> Result<Vc<Box<dyn ChunkingContext>>> {
     let next_mode = mode.await?;
     let mut builder = BrowserChunkingContext::builder(
         project_path,

@@ -88,11 +88,8 @@ describe('app dir - navigation', () => {
           // App Router doesn't re-render on initial load (the params are baked
           // server side). In development, effects will render twice.
 
-          // experimental react is having issues with this use effect
-          // @acdlite will take a look
-          // TODO: remove this PPR cond after react fixes the issue in experimental build.
-          waitForNEffects:
-            isNextDev && !process.env.__NEXT_EXPERIMENTAL_PPR ? 2 : 1,
+          // TODO: modern StrictMode does not double invoke effects during hydration: https://github.com/facebook/react/pull/28951
+          waitForNEffects: 1,
         },
         {
           router: 'pages',
@@ -910,6 +907,17 @@ describe('app dir - navigation', () => {
       await retry(async () => {
         expect(await browser.elementByCss('h1').text()).toBe('Home')
       })
+    })
+  })
+
+  describe('middleware redirect', () => {
+    it('should change browser location when router.refresh() gets a redirect response', async () => {
+      const browser = await next.browser('/redirect-on-refresh/auth')
+      await retry(async () =>
+        expect(await browser.url()).toBe(
+          next.url + '/redirect-on-refresh/dashboard'
+        )
+      )
     })
   })
 })
