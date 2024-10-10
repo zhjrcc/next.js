@@ -13,7 +13,7 @@ where
     comments: C,
 }
 
-pub fn lint_error_comment<C>(comments: C) -> impl Vsiit
+pub fn lint_error_comment<C>(comments: C) -> impl Visit
 where
     C: Comments,
 {
