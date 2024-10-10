@@ -1,5 +1,5 @@
 use swc_core::ecma::{
-    ast::Script,
+    ast::{Module, Script},
     visit::{Fold, Visit},
 };
 

@@ -31,7 +31,7 @@ where
 
 fn report(span: Span, msg: &str) {
     HANDLER.with(|handler| {
-        handler.struct_span_err(span, &msg).emit();
+        handler.struct_span_err(span, msg).emit();
     })
 }
 
@@ -40,12 +40,16 @@ where
     C: Comments,
 {
     fn visit_span(&mut self, s: &Span) {
-        self.comments.with_leading(s.lo, |c| {
-            self.lint(c, true);
+        self.comments.with_leading(s.lo, |comments| {
+            for c in comments {
+                self.lint(c, true);
+            }
         });
 
-        self.comments.with_trailing(s.hi, |c| {
-            self.lint(c, false);
+        self.comments.with_trailing(s.hi, |comments| {
+            for c in comments {
+                self.lint(c, false);
+            }
         });
     }
 }
