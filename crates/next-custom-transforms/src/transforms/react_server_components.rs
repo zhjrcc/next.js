@@ -350,18 +350,18 @@ fn report_error(app_dir: &Option<PathBuf>, filepath: &str, error_kind: RSCErrorK
             DUMMY_SP
         ),
         RSCErrorKind::NoComponentExport { is_layout: true } => (
-            "A layout file need to have a React Component exported via `export default`.\n\n\
+            "A layout file needs to have a React Component exported via `export default`.\n\n\
             See https://nextjs.org/docs/app/building-your-application/routing/layouts-and-templates#layouts".to_string(),
             DUMMY_SP
         ),
         RSCErrorKind::NoComponentExport { is_layout: false } => (
-            "A page file need to have a React Component exported via `export default`.\n\n\
+            "A page file needs to have a React Component exported via `export default`.\n\n\
             See https://nextjs.org/docs/app/building-your-application/routing/pages".to_string(),
             DUMMY_SP
         ),
         RSCErrorKind::NoComponentExportWithRecommendation { is_layout: true, export_name, span } => (
             format!(
-                "A layout file need to have a React Component exported via `export default`.\n\
+                "A layout file needs to have a React Component exported via `export default`.\n\
                 Maybe you did mean to default export `{}`?.\n\n\
                 See https://nextjs.org/docs/app/building-your-application/routing/layouts-and-templates#layouts",
                 export_name
@@ -370,7 +370,7 @@ fn report_error(app_dir: &Option<PathBuf>, filepath: &str, error_kind: RSCErrorK
         ),
         RSCErrorKind::NoComponentExportWithRecommendation { is_layout: false, export_name, span } => (
             format!(
-                "A page file need to have a React Component exported via `export default`.\n\
+                "A page file needs to have a React Component exported via `export default`.\n\
                 Maybe you did mean to default export `{}`?.\n\n\
                 See https://nextjs.org/docs/app/building-your-application/routing/pages",
                 export_name

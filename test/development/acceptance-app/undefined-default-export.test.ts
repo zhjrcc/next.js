@@ -19,7 +19,7 @@ describe('Undefined default export', () => {
     await session.assertHasRedbox()
     expect(await session.getRedboxDescription()).toInclude('Failed to compile')
     expect(await session.getRedboxSource()).toInclude(
-      'A page file need to have a React Component exported via `export default`.'
+      'A page file needs to have a React Component exported via `export default`.'
     )
 
     await cleanup()
@@ -37,7 +37,7 @@ describe('Undefined default export', () => {
     await session.assertHasRedbox()
     expect(await session.getRedboxDescription()).toInclude('Failed to compile')
     expect(await session.getRedboxSource()).toInclude(
-      'A page file need to have a React Component exported via `export default`.'
+      'A page file needs to have a React Component exported via `export default`.'
     )
     expect(await session.getRedboxSource()).toInclude(
       'Maybe you did mean to default export `Page`?.'
@@ -77,7 +77,7 @@ describe('Undefined default export', () => {
     await session.assertHasRedbox()
     expect(await session.getRedboxDescription()).toInclude('Failed to compile')
     expect(await session.getRedboxSource()).toInclude(
-      'A page file need to have a React Component exported via `export default`.'
+      'A page file needs to have a React Component exported via `export default`.'
     )
 
     await cleanup()
@@ -98,7 +98,7 @@ describe('Undefined default export', () => {
     await session.assertHasRedbox()
     expect(await session.getRedboxDescription()).toInclude('Failed to compile')
     expect(await session.getRedboxSource()).toInclude(
-      'A page file need to have a React Component exported via `export default`.'
+      'A page file needs to have a React Component exported via `export default`.'
     )
 
     await cleanup()
