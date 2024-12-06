@@ -160,7 +160,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
 
     await assertHasRedbox(browser)
     const source = next.normalizeTestDirContent(await getRedboxSource(browser))
-    if (basePath === '' && !isTurbopack) {
+    if (!isTurbopack) {
       expect(source).toMatchInlineSnapshot(`
           "./pages/hmr/about2.js
           Error:   x Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
@@ -184,43 +184,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
           Import trace for requested module:
           ./pages/hmr/about2.js"
         `)
-    } else if (basePath === '' && isTurbopack) {
-      expect(source).toMatchInlineSnapshot(`
-            "./pages/hmr/about2.js:7:1
-            Parsing ecmascript source code failed
-              5 |     div
-              6 |   )
-            > 7 | }
-                | ^
-              8 |
-
-            Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?"
-          `)
-    } else if (basePath === '/docs' && !isTurbopack) {
-      expect(source).toMatchInlineSnapshot(`
-          "./pages/hmr/about2.js
-          Error:   x Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
-             ,-[7:1]
-           4 |       <p>This is the about page.</p>
-           5 |     div
-           6 |   )
-           7 | }
-             : ^
-             \`----
-            x Unexpected eof
-             ,-[7:3]
-           5 |     div
-           6 |   )
-           7 | }
-             \`----
-
-          Caused by:
-              Syntax Error
-
-          Import trace for requested module:
-          ./pages/hmr/about2.js"
-        `)
-    } else if (basePath === '/docs' && isTurbopack) {
+    } else {
       expect(source).toMatchInlineSnapshot(`
             "./pages/hmr/about2.js:7:1
             Parsing ecmascript source code failed
