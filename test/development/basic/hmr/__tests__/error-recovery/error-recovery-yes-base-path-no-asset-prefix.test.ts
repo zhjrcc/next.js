@@ -6,7 +6,6 @@ import {
   getRedboxHeader,
   getRedboxDescription,
   getRedboxSource,
-  renderViaHTTP,
   retry,
   waitFor,
 } from 'next-test-utils'
@@ -16,7 +15,7 @@ import { outdent } from 'outdent'
 const nextConfig = { basePath: '/docs', assetPrefix: '' }
 
 describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () => {
-  const { next } = nextTestSetup({
+  const { next, isTurbopack } = nextTestSetup({
     files: join(__dirname, '../../fixtures'),
     nextConfig,
     patchFileDelay: 500,
@@ -92,7 +91,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
       throw err
     }
   })
-  ;(process.env.TURBOPACK ? it.skip : it)(
+  ;(isTurbopack ? it.skip : it)(
     // this test fails frequently with turbopack
     'should not continously poll a custom error page',
     async () => {
@@ -161,7 +160,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
 
     await assertHasRedbox(browser)
     const source = next.normalizeTestDirContent(await getRedboxSource(browser))
-    if (basePath === '' && !process.env.TURBOPACK) {
+    if (basePath === '' && !isTurbopack) {
       expect(source).toMatchInlineSnapshot(`
           "./pages/hmr/about2.js
           Error:   x Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
@@ -185,7 +184,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
           Import trace for requested module:
           ./pages/hmr/about2.js"
         `)
-    } else if (basePath === '' && process.env.TURBOPACK) {
+    } else if (basePath === '' && isTurbopack) {
       expect(source).toMatchInlineSnapshot(`
             "./pages/hmr/about2.js:7:1
             Parsing ecmascript source code failed
@@ -197,7 +196,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
 
             Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?"
           `)
-    } else if (basePath === '/docs' && !process.env.TURBOPACK) {
+    } else if (basePath === '/docs' && !isTurbopack) {
       expect(source).toMatchInlineSnapshot(`
           "./pages/hmr/about2.js
           Error:   x Unexpected token. Did you mean \`{'}'}\` or \`&rbrace;\`?
@@ -221,7 +220,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
           Import trace for requested module:
           ./pages/hmr/about2.js"
         `)
-    } else if (basePath === '/docs' && process.env.TURBOPACK) {
+    } else if (basePath === '/docs' && isTurbopack) {
       expect(source).toMatchInlineSnapshot(`
             "./pages/hmr/about2.js:7:1
             Parsing ecmascript source code failed
@@ -244,14 +243,14 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
     })
   })
 
-  if (!process.env.TURBOPACK) {
+  if (!isTurbopack) {
     // Turbopack doesn't have this restriction
     it('should show the error on all pages', async () => {
       const aboutPage = join('pages', 'hmr', 'about2.js')
       const aboutContent = await next.readFile(aboutPage)
       const browser = await next.browser(basePath + '/hmr/contact')
       try {
-        await renderViaHTTP(next.url, basePath + '/hmr/about2')
+        await next.render(basePath + '/hmr/about2')
 
         await next.patchFile(aboutPage, aboutContent.replace('</div>', 'div'))
 
@@ -513,7 +512,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
       await assertHasRedbox(browser)
       expect(await getRedboxHeader(browser)).toMatch('Failed to compile')
 
-      if (process.env.TURBOPACK) {
+      if (isTurbopack) {
         expect(await getRedboxSource(browser)).toMatchInlineSnapshot(`
               "./components/parse-error.xyz
               Unknown module type
@@ -583,7 +582,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
       let redboxSource = await getRedboxSource(browser)
 
       redboxSource = redboxSource.replace(`${next.testDir}`, '.')
-      if (process.env.TURBOPACK) {
+      if (isTurbopack) {
         expect(next.normalizeTestDirContent(redboxSource))
           .toMatchInlineSnapshot(`
               "./components/parse-error.js:3:1
@@ -716,7 +715,7 @@ describe(`HMR - Error Recovery, nextConfig: ${JSON.stringify(nextConfig)}`, () =
     }
   })
 
-  if (!process.env.TURBOPACK) {
+  if (!isTurbopack) {
     it('should have client HMR events in trace file', async () => {
       const traceData = await next.readFile('.next/trace')
       expect(traceData).toContain('client-hmr-latency')
