@@ -32,7 +32,7 @@ use crate::{
     analyzer::graph::EvalContext,
     chunk::{EcmascriptChunkPlaceable, EcmascriptExports},
     code_gen::{CodeGenerateable, CodeGeneration, CodeGenerationHoistedStmt},
-    magic_identifier,
+    magic_identifier, EcmascriptParsable,
 };
 
 #[derive(Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize, TraceRawVcs)]
@@ -416,10 +416,9 @@ fn emit_star_exports_issue(source_ident: Vc<AssetIdent>, message: RcStr) {
 #[turbo_tasks::value(shared)]
 #[derive(Hash, Debug)]
 pub struct EsmExports {
+    pub parsable: ResolvedVc<Box<dyn EcmascriptParsable>>,
     pub exports: BTreeMap<RcStr, EsmExport>,
     pub star_exports: Vec<ResolvedVc<Box<dyn ModuleReference>>>,
-    #[turbo_tasks(debug_ignore, trace_ignore)]
-    pub eval_context: EvalContext,
 }
 
 /// The expanded version of [EsmExports], the `exports` field here includes all
