@@ -22,11 +22,37 @@ describe('Dynamic IO Dev Errors', () => {
   it('should show a red box error on the SSR render', async () => {
     const browser = await next.browser('/error')
 
-    await openRedbox(browser)
+    if (isTurbopack) {
+      await expect(browser).toDisplayCollapsedRedbox(`
+       {
+         "description": "[ Server ] Error: Route "/error" used \`Math.random()\` outside of \`"use cache"\` and without explicitly calling \`await connection()\` beforehand. See more info here: https://nextjs.org/docs/messages/next-prerender-random",
+         "source": "app/error/page.tsx (2:23) @ Page
 
-    expect(await getRedboxDescription(browser)).toMatchInlineSnapshot(
-      `"[ Server ] Error: Route "/error" used \`Math.random()\` outside of \`"use cache"\` and without explicitly calling \`await connection()\` beforehand. See more info here: https://nextjs.org/docs/messages/next-prerender-random"`
-    )
+         1 | export default async function Page() {
+       > 2 |   const random = Math.random()
+           |                       ^
+         3 |   return <div id="another-random">{random}</div>
+         4 | }
+         5 |",
+         "stack": "<empty>",
+       }
+      `)
+    } else {
+      await expect(browser).toDisplayCollapsedRedbox(`
+       {
+         "description": "[ Server ] Error: Route "/error" used \`Math.random()\` outside of \`"use cache"\` and without explicitly calling \`await connection()\` beforehand. See more info here: https://nextjs.org/docs/messages/next-prerender-random",
+         "source": "app/error/page.tsx (2:23) @ random
+
+         1 | export default async function Page() {
+       > 2 |   const random = Math.random()
+           |                       ^
+         3 |   return <div id="another-random">{random}</div>
+         4 | }
+         5 |",
+         "stack": "<empty>",
+       }
+      `)
+    }
   })
 
   it('should show a red box error on client navigations', async () => {

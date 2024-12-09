@@ -949,7 +949,7 @@ export function getRedboxTitle(browser: BrowserInterface) {
   })
 }
 
-export function getRedboxDescription(browser: BrowserInterface) {
+export function getRedboxDescription(browser: BrowserInterface): Promise<string> {
   return browser.eval(() => {
     const portal = [].slice
       .call(document.querySelectorAll('nextjs-portal'))
