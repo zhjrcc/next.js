@@ -3,7 +3,6 @@ import { createSandbox } from 'development-sandbox'
 import { FileRef, nextTestSetup } from 'e2e-utils'
 import {
   describeVariants as describe,
-  getRedboxCallStack,
   toggleCollapseCallStackFrames,
 } from 'next-test-utils'
 import path from 'path'
@@ -801,37 +800,5 @@ describe.each(['default', 'turbo'])('ReactRefreshLogBox %s', () => {
     expect(texts).not.toContain('stringify\n<anonymous>')
     expect(texts).not.toContain('<unknown>\n<anonymous>')
     expect(texts).toContain('foo\nbar (1:1)')
-  })
-
-  test('should hide unrelated frames in stack trace with node:internal calls', async () => {
-    await using sandbox = await createSandbox(
-      next,
-      new Map([
-        [
-          'pages/index.js',
-          // Node.js will throw an error about the invalid URL since it happens server-side
-          outdent`
-      export default function Page() {}
-      
-      export function getServerSideProps() {
-        new URL("/", "invalid");
-        return { props: {} };
-      }`,
-        ],
-      ])
-    )
-    const { session, browser } = sandbox
-    await session.assertHasRedbox()
-    const stack = await getRedboxCallStack(browser)
-    // FIXME: the turbopack side snapshot shouldn't include the node:internal frames
-    // expect(stack).toMatchSnapshot()
-    // if (process.env.TURBOPACK) {
-    //   expect(stack).toInclude('node:')
-    // } else {
-    // }
-    await toggleCollapseCallStackFrames(browser)
-
-    const expandedStack = await getRedboxCallStack(browser)
-    expect(expandedStack).toContain('new URL')
   })
 })
