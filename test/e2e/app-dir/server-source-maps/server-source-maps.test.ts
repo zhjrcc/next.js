@@ -163,7 +163,7 @@ describe('app-dir - server source maps', () => {
 
   it('thrown SSR errors', async () => {
     const outputIndex = next.cliOutput.length
-    await next.render('/ssr-throw')
+    const browser = await next.browser('/ssr-throw')
 
     if (isNextDev) {
       await retry(() => {
@@ -198,6 +198,36 @@ describe('app-dir - server source maps', () => {
               "\n  digest: '"
       )
       expect(cliOutput).toMatch(/digest: '\d+'/)
+
+      if (isTurbopack) {
+        await expect(browser).toDisplayRedbox(`
+         {
+           "count": 1,
+           "description": "Error: Boom",
+           "source": "app/ssr-throw/Thrower.js (4:9) @ throwError
+         > 4 |   throw new Error('Boom')
+             |         ^",
+           "stack": [
+             "Thrower app/ssr-throw/Thrower.js (8:3)",
+           ],
+           "title": "Unhandled Runtime Error",
+         }
+        `)
+      } else {
+        await expect(browser).toDisplayRedbox(`
+         {
+           "count": 1,
+           "description": "Error: Boom",
+           "source": "app/ssr-throw/Thrower.js (4:9) @ throwError
+         > 4 |   throw new Error('Boom')
+             |         ^",
+           "stack": [
+             "throwError app/ssr-throw/Thrower.js (8:3)",
+           ],
+           "title": "Unhandled Runtime Error",
+         }
+        `)
+      }
     } else {
       // TODO: Test `next build` with `--enable-source-maps`.
     }
