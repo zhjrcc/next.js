@@ -54,6 +54,13 @@ exports[`ReactRefreshLogBox default module init error not shown 1`] = `
   6 |     return <h1>Default Export</h1>;"
 `;
 
+exports[`ReactRefreshLogBox default should hide unrelated frames in stack trace with node:internal calls 1`] = `
+"eval
+./dist/esm/server/route-modules/pages/module.js
+renderToHTMLImpl
+./dist/esm/server/route-modules/pages/module.js"
+`;
+
 exports[`ReactRefreshLogBox default should strip whitespace correctly with newline 1`] = `
 "index.js (8:27) @ onClick
 

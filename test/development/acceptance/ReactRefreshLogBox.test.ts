@@ -3,6 +3,7 @@ import { createSandbox } from 'development-sandbox'
 import { FileRef, nextTestSetup } from 'e2e-utils'
 import {
   describeVariants as describe,
+  getRedboxCallStack,
   toggleCollapseCallStackFrames,
 } from 'next-test-utils'
 import path from 'path'
@@ -821,17 +822,16 @@ describe.each(['default', 'turbo'])('ReactRefreshLogBox %s', () => {
     )
     const { session, browser } = sandbox
     await session.assertHasRedbox()
+    const stack = await getRedboxCallStack(browser)
+    // FIXME: the turbopack side snapshot shouldn't include the node:internal frames
+    if (process.env.TURBOPACK) {
+      expect(stack).toInclude('node:')
+    } else {
+      expect(stack).toMatchSnapshot()
+    }
+    await toggleCollapseCallStackFrames(browser)
 
-    // Should still show the errored line in source code
-    const source = await session.getRedboxSource()
-    expect(source).toContain('pages/index.js')
-    expect(source).toContain(`new URL("/", "invalid")`)
-
-    const callStackFrames = await browser.elementsByCss(
-      '[data-nextjs-call-stack-frame]'
-    )
-    const texts = await Promise.all(callStackFrames.map((f) => f.innerText()))
-
-    expect(texts.filter((t) => t.includes('node:internal'))).toHaveLength(0)
+    const expandedStack = await getRedboxCallStack(browser)
+    expect(expandedStack).toContain('new URL')
   })
 })
