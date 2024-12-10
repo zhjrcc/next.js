@@ -255,4 +255,40 @@ describe('app-dir - server source maps', () => {
       isNextDev ? 'Error [MyError]: Bar' : 'Error [MyError]: Bar'
     )
   })
+
+  it('sourcemaps errors during module evaluation', async () => {
+    const outputIndex = next.cliOutput.length
+    await next.browser('/module-evaluation')
+
+    if (isNextDev) {
+      await retry(() => {
+        expect(next.cliOutput.slice(outputIndex)).toContain('Error: Boom')
+      })
+      const cliOutput = stripAnsi(next.cliOutput.slice(outputIndex))
+      if (isTurbopack) {
+        expect(cliOutput).toContain(
+          '' +
+            '\n ⨯ Error: Boom' +
+            '\n    at eval (app/module-evaluation/module.js:1:6)' +
+            // TODO(veil): Should be sourcemapped and possibly redundant with earlier frame
+            '\n    at (rsc)/./app/module-evaluation/module.js (.next/'
+        )
+      } else {
+        expect(cliOutput).toContain(
+          '' +
+            '\n ⨯ Error: Boom' +
+            // TODO(veil): Should map to no name like you'd get with native stacks without a bundler. Though the layer is not noise.
+            '\n    at [project]/app/module-evaluation/module.js [app-rsc] (ecmascript) (app/module-evaluation/module.js:1:6)' +
+            '\n    at [project]/app/module-evaluation/page.js [app-rsc] (ecmascript) (app/module-evaluation/page.js:1:0)' +
+            // TOOD(veil): Should be sourcemapped
+            '\n     at [project]/app/module-evaluation/page.js [app-rsc] (ecmascript, Next.js server component) (.next' +
+            '\n    ' +
+            '\n    ' +
+            '\n    '
+        )
+      }
+    } else {
+      // TODO: test `next build` with `--enable-source-maps`
+    }
+  })
 })
