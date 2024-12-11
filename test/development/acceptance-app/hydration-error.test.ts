@@ -936,7 +936,9 @@ describe('Error overlay for hydration errors in App router', () => {
           'app/layout.js',
           outdent`
           export default function Layout({ children }) {
-            return <html>{children}</html>
+            return (
+              <html><body><html>{children}</html></body></html>
+            )
           }
           `,
         ],
@@ -944,11 +946,7 @@ describe('Error overlay for hydration errors in App router', () => {
           'app/page.js',
           outdent`
             export default function Page() {
-              return (
-                <html>
-                  <p>hello</p>
-                </html>
-              )
+              return <p>hello</p>
             }
           `,
         ],
@@ -958,13 +956,16 @@ describe('Error overlay for hydration errors in App router', () => {
     await session.openRedbox()
 
     const description = await session.getRedboxDescription()
-    expect(description).toMatchInlineSnapshot(``)
+    expect(description).toMatchInlineSnapshot(`
+     "In HTML, <p> cannot be a child of <html>.
+     This will cause a hydration error."
+    `)
 
     const pseudoHtml = await session.getRedboxComponentStack()
     if (isTurbopack) {
-      expect(pseudoHtml).toMatchInlineSnapshot(``)
+      expect(pseudoHtml).toMatchInlineSnapshot(`""`)
     } else {
-      expect(pseudoHtml).toMatchInlineSnapshot(``)
+      expect(pseudoHtml).toMatchInlineSnapshot(`""`)
     }
   })
 })
