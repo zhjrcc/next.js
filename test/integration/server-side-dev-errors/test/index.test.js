@@ -77,7 +77,7 @@ describe('server-side dev errors', () => {
       } else {
         expect(stderrOutput).toStartWith(
           '⨯ ReferenceError: missingVar is not defined' +
-            // TODO(veil): Should be "at getStaticProps"
+            // TODO(NDX-531): Should be "at getStaticProps"
             '\n    at missingVar (../../test/integration/server-side-dev-errors/pages/gsp.js:6:2)' +
             // Next.js internal frame. Feel free to adjust.
             // Not ignore-listed because we're not in an isolated app and Next.js is symlinked so it's not in node_modules
@@ -130,7 +130,7 @@ describe('server-side dev errors', () => {
       } else {
         expect(stderrOutput).toStartWith(
           '⨯ ReferenceError: missingVar is not defined' +
-            // TODO(veil): Should be "at getServerSideProps"
+            // TODO(NDX-531): Should be "at getServerSideProps"
             '\n    at missingVar (../../test/integration/server-side-dev-errors/pages/gssp.js:6:2)' +
             // Next.js internal frame. Feel free to adjust.
             // Not ignore-listed because we're not in an isolated app and Next.js is symlinked so it's not in node_modules
@@ -183,7 +183,7 @@ describe('server-side dev errors', () => {
       } else {
         expect(stderrOutput).toStartWith(
           '⨯ ReferenceError: missingVar is not defined' +
-            // TODO(veil): Should be "at getServerSideProps"
+            // TODO(NDX-531): Should be "at getServerSideProps"
             '\n    at missingVar (../../test/integration/server-side-dev-errors/pages/blog/[slug].js:6:2)' +
             // Next.js internal frame. Feel free to adjust.
             // Not ignore-listed because we're not in an isolated app and Next.js is symlinked so it's not in node_modules
@@ -236,7 +236,7 @@ describe('server-side dev errors', () => {
       } else {
         expect(stderrOutput).toStartWith(
           '⨯ ReferenceError: missingVar is not defined' +
-            // TODO(veil): Should be "at handler"
+            // TODO(NDX-531): Should be "at handler"
             '\n    at missingVar (../../test/integration/server-side-dev-errors/pages/api/hello.js:2:2)' +
             // Next.js internal frame. Feel free to adjust.
             // Not ignore-listed because we're not in an isolated app and Next.js is symlinked so it's not in node_modules
@@ -290,7 +290,7 @@ describe('server-side dev errors', () => {
       } else {
         expect(stderrOutput).toContain(
           ' ⨯ ReferenceError: missingVar is not defined' +
-            // TODO(veil): Should be "at handler"
+            // TODO(NDX-531): Should be "at handler"
             '\n    at missingVar (../../test/integration/server-side-dev-errors/pages/api/blog/[slug].js:2:2)' +
             // Next.js internal frame. Feel free to adjust.
             // Not ignore-listed because we're not in an isolated app and Next.js is symlinked so it's not in node_modules

@@ -23,7 +23,8 @@ declare global {
        * Unintented content in the snapshot should be reported to the Next.js DX team.
        * <FIXME-internal-frame> in the snapshot would be unintended.
        * Any node_modules in the snapshot would be unintended.
-       * Differences in the snapshot between Turbopack and Webpack would be unintended though is already known.
+       * Differences in the snapshot between Turbopack and Webpack would be unintended.
+       * Differences in the name mapping between Turbopack and Webpack are known (NDX-531).
        *
        * @param inlineSnapshot - The snapshot to compare against.
        */
@@ -31,13 +32,14 @@ declare global {
 
       /**
        * Inline snapshot matcher for a Redbox that's collapsed by default.
-       * When a Redbox is immediately displayed ,
+       * When a Redbox is immediately displayed,
        * use {@link toDisplayRedbox} instead.
        *
        * Unintented content in the snapshot should be reported to the Next.js DX team.
        * <FIXME-internal-frame> in the snapshot would be unintended.
        * Any node_modules in the snapshot would be unintended.
-       * Differences in the snapshot between Turbopack and Webpack would be unintended though is already known.
+       * Differences in the snapshot between Turbopack and Webpack would be unintended.
+       * Differences in the name mapping between Turbopack and Webpack are known (NDX-531).
        *
        * @param inlineSnapshot - The snapshot to compare against.
        */

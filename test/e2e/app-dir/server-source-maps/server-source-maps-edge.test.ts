@@ -81,7 +81,7 @@ describe('app-dir - server source maps edge runtime', () => {
               "\n  digest: '"
           : '\n ⨯ Error: Boom' +
               '\n    at throwError (app/ssr-throw/page.js:4:8)' +
-              // TODO(veil): Method name should be "Page"
+              // TODO(NDX-531): Method name should be "Page"
               '\n    at throwError (app/ssr-throw/page.js:8:2)' +
               '\n  2 |' +
               '\n  3 | function throwError() {' +
@@ -122,7 +122,7 @@ describe('app-dir - server source maps edge runtime', () => {
               "\n  digest: '"
           : '\n ⨯ Error: Boom' +
               '\n    at throwError (app/rsc-throw/page.js:2:8)' +
-              // TODO(veil): Method name should be "Page"
+              // TODO(NDX-531): Method name should be "Page"
               '\n    at throwError (app/rsc-throw/page.js:6:2)' +
               '\n  1 | function throwError() {' +
               "\n> 2 |   throw new Error('Boom')" +
