@@ -34,7 +34,6 @@ use turbo_tasks_hash::hash_xxh3_hash64;
 use turbopack_core::{
     chunk::{module_id_strategies::GlobalModuleIdStrategy, ChunkingType},
     context::AssetContext,
-    ident::AssetIdent,
     issue::{Issue, IssueExt},
     module::{Module, Modules},
     reference::primary_chunkable_referenced_modules,
@@ -48,11 +47,7 @@ use crate::{
     client_references::{map_client_references, ClientReferenceMapType, ClientReferencesSet},
     dynamic_imports::{map_next_dynamic, DynamicImportEntries, DynamicImportEntriesMapType},
     project::Project,
-    route::{AppPageRoute, Route},
-    server_actions::{
-        map_server_actions, server_actions_loader_modifier, to_rsc_context, AllActions,
-        AllModuleActions,
-    },
+    server_actions::{map_server_actions, to_rsc_context, AllActions, AllModuleActions},
 };
 
 #[turbo_tasks::value(transparent)]
@@ -136,6 +131,7 @@ enum SingleModuleGraphBuilderNode {
         source_ident: ReadRef<RcStr>,
         target: ResolvedVc<Box<dyn Module>>,
         target_ident: ReadRef<RcStr>,
+        target_layer: Option<ReadRef<RcStr>>,
     },
     Module {
         module: ResolvedVc<Box<dyn Module>>,
@@ -164,12 +160,17 @@ impl SingleModuleGraphBuilderNode {
         target: ResolvedVc<Box<dyn Module>>,
         chunking_type: ChunkingType,
     ) -> Result<Self> {
+        let target_ident = target.ident();
         Ok(Self::ChunkableReference {
             chunking_type,
             source,
             source_ident: source.ident().to_string().await?,
             target,
-            target_ident: target.ident().to_string().await?,
+            target_ident: target_ident.to_string().await?,
+            target_layer: match target_ident.await?.layer {
+                Some(layer) => Some(layer.await?),
+                None => None,
+            },
         })
     }
 }
@@ -302,6 +303,8 @@ impl SingleModuleGraph {
             .await?;
 
         let children_nodes_iter = AdjacencyMap::new()
+            // TODO we might want to change this to skip via SingleModuleGraphBuilder::visit
+            // instead, to better handle visited_nodes (and at least revisit that single edge).
             .skip_duplicates_with_visited_nodes(VisitedNodes(
                 visited_modules
                     .iter()
@@ -320,17 +323,19 @@ impl SingleModuleGraph {
         {
             let _span = tracing::info_span!("build module graph").entered();
             for (parent, current) in children_nodes_iter.into_breadth_first_edges() {
-                let parent_edge = parent.map(|parent| match parent {
-                    SingleModuleGraphBuilderNode::Module { module, .. } => {
-                        (*modules.get(&module).unwrap(), COMMON_CHUNKING_TYPE)
+                let parent = if let Some(parent) = parent {
+                    match parent {
+                        SingleModuleGraphBuilderNode::Module { module, .. } => {
+                            Some(*modules.get(&module).unwrap())
+                        }
+                        // was already handled in the previous iteration
+                        SingleModuleGraphBuilderNode::ChunkableReference { .. } => continue,
+                        // should never have children anyway
+                        SingleModuleGraphBuilderNode::Issues { .. } => unreachable!(),
                     }
-                    SingleModuleGraphBuilderNode::ChunkableReference {
-                        source,
-                        chunking_type,
-                        ..
-                    } => (*modules.get(&source).unwrap(), chunking_type),
-                    SingleModuleGraphBuilderNode::Issues { .. } => unreachable!(),
-                });
+                } else {
+                    None
+                };
 
                 match current {
                     SingleModuleGraphBuilderNode::Module {
@@ -351,16 +356,35 @@ impl SingleModuleGraph {
                             idx
                         };
                         // Add the edge
-                        if let Some((parent_idx, chunking_type)) = parent_edge {
-                            graph.add_edge(parent_idx, current_idx, chunking_type);
+                        if let Some(parent_idx) = parent {
+                            graph.add_edge(parent_idx, current_idx, COMMON_CHUNKING_TYPE);
                         }
                     }
-                    SingleModuleGraphBuilderNode::ChunkableReference { .. } => {
-                        // Ignore. They are handled when visiting the next edge
-                        // (ChunkableReference -> Module)
+                    SingleModuleGraphBuilderNode::ChunkableReference {
+                        target,
+                        target_layer,
+                        chunking_type,
+                        ..
+                    } => {
+                        // Handle them  right now, because there might not be a child module if it
+                        // was already visited in `visited_modules`.
+                        // Find the target node, if it was already added
+                        let target_idx = if let Some(target_idx) = modules.get(&target) {
+                            *target_idx
+                        } else {
+                            let idx = graph.add_node(SingleModuleGraphNode {
+                                module: target,
+                                issues: Default::default(),
+                                layer: target_layer,
+                            });
+                            modules.insert(target, idx);
+                            idx
+                        };
+                        let parent_idx = parent.unwrap();
+                        graph.add_edge(parent_idx, target_idx, chunking_type);
                     }
                     SingleModuleGraphBuilderNode::Issues(new_issues) => {
-                        let (parent_idx, _) = parent_edge.unwrap();
+                        let parent_idx = parent.unwrap();
                         graph
                             .node_weight_mut(parent_idx)
                             .unwrap()
@@ -595,9 +619,17 @@ impl SingleModuleGraph {
         SingleModuleGraph::new_inner(None, &*entries.await?, &Default::default()).await
     }
 
-    /// `root` is connected to the entries and include in `self.entries`.
     #[turbo_tasks::function]
     async fn new_with_entries_visited(
+        entries: Vc<Modules>,
+        visited_modules: Vc<ModuleSet>,
+    ) -> Result<Vc<Self>> {
+        SingleModuleGraph::new_inner(None, &*entries.await?, &*visited_modules.await?).await
+    }
+
+    /// `root` is connected to the entries and include in `self.entries`.
+    #[turbo_tasks::function]
+    async fn new_with_entries_visited_root(
         root: ResolvedVc<Box<dyn Module>>,
         // This must not be a Vc<Vec<_>> to ensure layout segment optimization hits the cache
         entries: Vec<ResolvedVc<Box<dyn Module>>>,
@@ -620,7 +652,7 @@ async fn get_module_graph_for_endpoint(
     let mut graphs = vec![];
 
     let mut visited_modules = if !server_utils.is_empty() {
-        let graph = SingleModuleGraph::new_with_entries_visited(
+        let graph = SingleModuleGraph::new_with_entries_visited_root(
             *entry,
             server_utils.iter().map(|m| **m).collect(),
             Vc::cell(Default::default()),
@@ -639,7 +671,7 @@ async fn get_module_graph_for_endpoint(
 
     // ast-grep-ignore: to-resolved-in-loop
     for module in server_component_entries.iter() {
-        let graph = SingleModuleGraph::new_with_entries_visited(
+        let graph = SingleModuleGraph::new_with_entries_visited_root(
             *entry,
             vec![Vc::upcast(**module)],
             Vc::cell(visited_modules.clone()),
@@ -657,7 +689,7 @@ async fn get_module_graph_for_endpoint(
 
     // Any previous iteration above would have added the entry node, but not actually visited it.
     visited_modules.remove(&entry);
-    let graph = SingleModuleGraph::new_with_entries_visited(
+    let graph = SingleModuleGraph::new_with_entries_visited_root(
         *entry,
         vec![*entry],
         Vc::cell(visited_modules.clone()),
@@ -1248,55 +1280,61 @@ pub async fn get_global_module_id_strategy(
     let graph = graph_op.strongly_consistent().await?;
     let _ = graph_op.take_collectibles::<Box<dyn Issue>>();
 
-    let mut additional_idents = vec![];
-    {
-        // This is a hack for the action loader modules that are currently created ad-hoc in
-        // AppEndpoint (and not part of the module graph). Changint that is difficult because this
-        // module is created with information from the single module graph
-        /*
-        [project]/test/e2e/app-dir/app-a11y/.next-internal/server/app/page-with-h1/page/actions.js [app-rsc] (server-actions-loader, ecmascript)
-        */
-        let rsc_layer = Vc::cell("app-rsc".into());
-        let ecmascript = Vc::cell("ecmascript".into());
-        let server_action_loader_ident = |page_name: &str| {
-            let path = project
-                .project_path()
-                .join(format!(".next-internal/server/app{page_name}/actions.js").into());
-            AssetIdent::from_path(path)
-                .with_layer(rsc_layer)
-                .with_modifier(server_actions_loader_modifier())
-                .with_modifier(ecmascript)
-        };
-        for (_, route) in project.entrypoints().await?.routes.iter() {
-            match route {
-                Route::AppPage(page_routes) => {
-                    for AppPageRoute { original_name, .. } in page_routes {
-                        additional_idents.push(server_action_loader_ident(original_name));
+    let extended_graph = {
+        let visited_modules: HashSet<_> = graph.iter_nodes().map(|n| n.module).collect();
+        let entries = project.get_all_entries().await?;
+        let additional_entries = project
+            .get_all_additional_entries({
+                let server_actions = vec![
+                    async {
+                        ServerActionsGraph::new_with_entries(graph_op, false)
+                            .to_resolved()
+                            .await
                     }
+                    .instrument(tracing::info_span!("generating server actions graphs"))
+                    .await?,
+                ];
+
+                // TODO use real object here once client_asset_context is gone
+                ReducedGraphs {
+                    next_dynamic: vec![],
+                    server_actions,
+                    client_references: vec![],
                 }
-                Route::AppRoute { original_name, .. } => {
-                    additional_idents.push(server_action_loader_ident(original_name));
-                }
-                _ => {}
+                .cell()
+            })
+            .await?;
+        let collect = entries
+            .iter()
+            .copied()
+            .chain(additional_entries.iter().copied())
+            .collect();
+        SingleModuleGraph::new_with_entries_visited(Vc::cell(collect), Vc::cell(visited_modules))
+            .await?
+    };
+
+    let graphs = [graph, extended_graph];
+
+    let mut idents: Vec<_> = graphs
+        .iter()
+        .flat_map(|graph| graph.iter_nodes())
+        .map(|node| node.module.ident())
+        .collect();
+
+    for graph in graphs.iter() {
+        // Add all the modules that are inserted by chunking (i.e. async loaders)
+        graph.traverse_edges(|(parent, current)| {
+            if let Some((_, &ChunkingType::Async)) = parent {
+                idents.push(
+                    current
+                        .module
+                        .ident()
+                        .with_modifier(async_loader_modifier()),
+                );
             }
-        }
+            GraphTraversalAction::Continue
+        })?;
     }
-
-    let mut idents = additional_idents;
-    idents.extend(graph.iter_nodes().map(|node| node.module.ident()));
-
-    // Add all the modules that are inserted by chunking (i.e. async loaders)
-    graph.traverse_edges(|(parent, current)| {
-        if let Some((_, &ChunkingType::Async)) = parent {
-            idents.push(
-                current
-                    .module
-                    .ident()
-                    .with_modifier(async_loader_modifier()),
-            );
-        }
-        GraphTraversalAction::Continue
-    })?;
 
     let module_id_map = idents
         .into_iter()
