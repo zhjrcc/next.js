@@ -714,25 +714,7 @@ async fn get_additional_module_graph_for_project(
     let visited_modules: HashSet<_> = graph.await?.iter_nodes().map(|n| n.module).collect();
     let entries = project.get_all_entries().await?;
     let additional_entries = project
-        .get_all_additional_entries({
-            let server_actions = vec![
-                async {
-                    ServerActionsGraph::new_with_entries(graph, false)
-                        .to_resolved()
-                        .await
-                }
-                .instrument(tracing::info_span!("generating server actions graphs"))
-                .await?,
-            ];
-
-            // TODO use real object here once client_asset_context is gone
-            ReducedGraphs {
-                next_dynamic: vec![],
-                server_actions,
-                client_references: vec![],
-            }
-            .cell()
-        })
+        .get_all_additional_entries(ReducedGraphs::new(vec![graph], false))
         .await?;
     let collect = entries
         .iter()
@@ -1108,6 +1090,52 @@ pub struct ReducedGraphs {
 
 #[turbo_tasks::value_impl]
 impl ReducedGraphs {
+    #[turbo_tasks::function]
+    async fn new(graphs: Vec<Vc<SingleModuleGraph>>, is_single_page: bool) -> Result<Vc<Self>> {
+        let next_dynamic = async {
+            graphs
+                .iter()
+                .map(|graph| {
+                    NextDynamicGraph::new_with_entries(*graph, is_single_page).to_resolved()
+                })
+                .try_join()
+                .await
+        }
+        .instrument(tracing::info_span!("generating next/dynamic graphs"))
+        .await?;
+
+        let server_actions = async {
+            graphs
+                .iter()
+                .map(|graph| {
+                    ServerActionsGraph::new_with_entries(*graph, is_single_page).to_resolved()
+                })
+                .try_join()
+                .await
+        }
+        .instrument(tracing::info_span!("generating server actions graphs"))
+        .await?;
+
+        let client_references = async {
+            graphs
+                .iter()
+                .map(|graph| {
+                    ClientReferencesGraph::new_with_entries(*graph, is_single_page).to_resolved()
+                })
+                .try_join()
+                .await
+        }
+        .instrument(tracing::info_span!("generating client references graphs"))
+        .await?;
+
+        Ok(Self {
+            next_dynamic,
+            server_actions,
+            client_references,
+        }
+        .cell())
+    }
+
     /// Returns the next/dynamic-ally imported (client) modules (from RSC and SSR modules) for the
     /// given endpoint.
     #[turbo_tasks::function]
@@ -1235,58 +1263,21 @@ async fn get_reduced_graphs_for_endpoint_inner(
             async move { get_module_graph_for_endpoint(*entry).await }
                 .instrument(tracing::info_span!("module graph for endpoint"))
                 .await?
-                .clone_value(),
+                .iter()
+                .map(|v| **v)
+                .collect(),
         ),
         NextMode::Build => (
             false,
             vec![
-                async move { get_module_graph_for_project(project).to_resolved().await }
+                async move { get_module_graph_for_project(project).resolve().await }
                     .instrument(tracing::info_span!("module graph for app"))
                     .await?,
             ],
         ),
     };
 
-    let next_dynamic = async {
-        graphs
-            .iter()
-            .map(|graph| NextDynamicGraph::new_with_entries(**graph, is_single_page).to_resolved())
-            .try_join()
-            .await
-    }
-    .instrument(tracing::info_span!("generating next/dynamic graphs"))
-    .await?;
-
-    let server_actions = async {
-        graphs
-            .iter()
-            .map(|graph| {
-                ServerActionsGraph::new_with_entries(**graph, is_single_page).to_resolved()
-            })
-            .try_join()
-            .await
-    }
-    .instrument(tracing::info_span!("generating server actions graphs"))
-    .await?;
-
-    let client_references = async {
-        graphs
-            .iter()
-            .map(|graph| {
-                ClientReferencesGraph::new_with_entries(**graph, is_single_page).to_resolved()
-            })
-            .try_join()
-            .await
-    }
-    .instrument(tracing::info_span!("generating client references graphs"))
-    .await?;
-
-    Ok(ReducedGraphs {
-        next_dynamic,
-        server_actions,
-        client_references,
-    }
-    .cell())
+    Ok(ReducedGraphs::new(graphs, is_single_page))
 }
 
 /// Generates a [ReducedGraph] for the given project and endpoint containing information that is
@@ -1307,9 +1298,6 @@ pub async fn get_reduced_graphs_for_endpoint(
     Ok(result)
 }
 
-/// Like get_reduced_graphs_for_endpoint, but may only be called for builds
-///
-/// If you can, use get_reduced_graphs_for_endpoint instead.
 #[turbo_tasks::function]
 pub async fn get_global_module_id_strategy(
     project: Vc<Project>,
@@ -1333,7 +1321,7 @@ pub async fn get_global_module_id_strategy(
         .collect();
 
     for graph in graphs.iter() {
-        // Add all the modules that are inserted by chunking (i.e. async loaders)
+        // Additionally, add all the modules that are inserted by chunking (i.e. async loaders)
         graph.traverse_edges(|(parent, current)| {
             if let Some((_, &ChunkingType::Async)) = parent {
                 idents.push(
