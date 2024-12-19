@@ -21,7 +21,7 @@ use turbopack_core::{
         availability_info::AvailabilityInfo, ChunkingContext, EvaluatableAsset, EvaluatableAssets,
         MinifyType,
     },
-    environment::{BrowserEnvironment, Environment, ExecutionEnvironment},
+    environment::{BrowserEnvironment, Environment, ExecutionEnvironment, NodeJsEnvironment},
     ident::AssetIdent,
     issue::{handle_issues, IssueReporter, IssueSeverity},
     module::Module,
@@ -181,17 +181,6 @@ async fn build_internal(
     minify_type: MinifyType,
     target: Target,
 ) -> Result<Vc<()>> {
-    let env = Environment::new(Value::new(ExecutionEnvironment::Browser(
-        BrowserEnvironment {
-            dom: true,
-            web_worker: false,
-            service_worker: false,
-            browserslist_query: browserslist_query.clone(),
-        }
-        .resolved_cell(),
-    )))
-    .to_resolved()
-    .await?;
     let output_fs = output_fs(project_dir.clone());
     let project_fs = project_fs(root_dir.clone());
     let project_relative = project_dir.strip_prefix(&*root_dir).unwrap();
@@ -209,6 +198,11 @@ async fn build_internal(
 
     let node_env = NodeEnv::Production.cell();
 
+    let runtime_type = match *node_env.await? {
+        NodeEnv::Development => RuntimeType::Development,
+        NodeEnv::Production => RuntimeType::Production,
+    };
+
     let chunking_context: Vc<Box<dyn ChunkingContext>> = match target {
         Target::Browser => Vc::upcast(
             BrowserChunkingContext::builder(
@@ -217,11 +211,18 @@ async fn build_internal(
                 build_output_root,
                 build_output_root,
                 build_output_root,
-                env,
-                match *node_env.await? {
-                    NodeEnv::Development => RuntimeType::Development,
-                    NodeEnv::Production => RuntimeType::Production,
-                },
+                Environment::new(Value::new(ExecutionEnvironment::Browser(
+                    BrowserEnvironment {
+                        dom: true,
+                        web_worker: false,
+                        service_worker: false,
+                        browserslist_query: browserslist_query.clone(),
+                    }
+                    .resolved_cell(),
+                )))
+                .to_resolved()
+                .await?,
+                runtime_type,
             )
             .minify_type(minify_type)
             .build(),
@@ -233,11 +234,12 @@ async fn build_internal(
                 build_output_root,
                 build_output_root,
                 build_output_root,
-                env,
-                match *node_env.await? {
-                    NodeEnv::Development => RuntimeType::Development,
-                    NodeEnv::Production => RuntimeType::Production,
-                },
+                Environment::new(Value::new(ExecutionEnvironment::NodeJsLambda(
+                    NodeJsEnvironment::default().resolved_cell(),
+                )))
+                .to_resolved()
+                .await?,
+                runtime_type,
             )
             .minify_type(minify_type)
             .build(),
