@@ -1348,8 +1348,7 @@ pub async fn get_global_module_id_strategy(
         })
         .collect();
 
-    // TODO clean up this call signature
-    let module_id_map = merge_preprocessed_module_ids(vec![Vc::cell(module_id_map)]).await?;
+    let module_id_map = merge_preprocessed_module_ids(&module_id_map).await?;
 
     GlobalModuleIdStrategy::new(module_id_map).await
 }
