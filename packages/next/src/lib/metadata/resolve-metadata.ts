@@ -940,5 +940,5 @@ export async function resolveViewport(
     createServerParamsForMetadata,
     workStore
   )
-  return accumulateViewport(metadataItems)
+  return await accumulateViewport(metadataItems)
 }
