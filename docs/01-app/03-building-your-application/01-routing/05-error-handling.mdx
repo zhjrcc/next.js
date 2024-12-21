@@ -1,11 +1,3 @@
----
-title: Error Handling
-description: Learn how to display expected errors and handle uncaught exceptions.
-related:
-  links:
-    - app/api-reference/file-conventions/error
----
-
 Errors can be divided into two categories: **expected errors** and **uncaught exceptions**:
 
 - **Model expected errors as return values**: Avoid using `try`/`catch` for expected errors in Server Actions. Use [`useActionState`](https://react.dev/reference/react/useActionState) to manage these errors and return them to the client.
